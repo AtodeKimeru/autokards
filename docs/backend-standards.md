@@ -1,6 +1,6 @@
 ---
-description: Backend development standards, best practices, and conventions for the LTI Node.js/TypeScript/Express application including Domain-Driven Design, SOLID principles, architecture patterns, API design, and testing practices
-globs: ["backend/src/**/*.ts", "backend/prisma/**/*.{prisma,ts}", "backend/jest.config.js", "backend/tsconfig.json", "backend/serverless.yml", "backend/package.json"]
+description: Backend development standards, best practices, and conventions for the Python application including Domain-Driven Design, SOLID principles, architecture patterns, API design, and testing practices
+globs: ["backend/**/*.py", "backend/pyproject.toml", "backend/alembic/**", "backend/tests/**/*.py"]
 alwaysApply: true
 ---
 
@@ -33,8 +33,8 @@ alwaysApply: true
   - [Dependency Inversion Principle (DIP)](#dependency-inversion-principle-dip)
   - [DRY (Don't Repeat Yourself)](#dry-dont-repeat-yourself)
 - [Coding Standards](#coding-standards)
-  - [Language and Naming Conventions](#language-and-naming-conventions)
-  - [TypeScript Usage](#typescript-usage)
+  - [Naming Conventions](#naming-conventions)
+  - [Type Hints & Typing](#type-hints--typing)
   - [Error Handling](#error-handling)
   - [Validation Patterns](#validation-patterns)
   - [Logging Standards](#logging-standards)
@@ -44,17 +44,17 @@ alwaysApply: true
   - [Error Response Format](#error-response-format)
   - [CORS Configuration](#cors-configuration)
 - [Database Patterns](#database-patterns)
-  - [Prisma Schema](#prisma-schema)
+  - [ORM Models & Schema](#orm-models--schema)
   - [Migrations](#migrations)
   - [Repository Pattern](#repository-pattern)
 - [Testing Standards](#testing-standards)
-  - [Unit Testing](#unit-testing)
-  - [Integration Testing](#integration-testing)
-  - [Test Coverage Requirements](#test-coverage-requirements)
-  - [Mocking Standards](#mocking-standards)
+  - [Test File Structure](#test-file-structure)
+  - [Test Organization Pattern](#test-organization-pattern)
+  - [Test Case Naming Convention](#test-case-naming-convention)
+  - [Test Structure (AAA Pattern)](#test-structure-aaa-pattern)
 - [Performance Best Practices](#performance-best-practices)
   - [Database Query Optimization](#database-query-optimization)
-  - [Async/Await Patterns](#asyncawait-patterns)
+  - [Async & I/O Patterns](#async--io-patterns)
   - [Error Handling Performance](#error-handling-performance)
 - [Security Best Practices](#security-best-practices)
   - [Input Validation](#input-validation)
@@ -64,1165 +64,734 @@ alwaysApply: true
   - [Git Workflow](#git-workflow)
   - [Development Scripts](#development-scripts)
   - [Code Quality](#code-quality)
-- [Serverless Deployment](#serverless-deployment)
-  - [AWS Lambda Configuration](#aws-lambda-configuration)
-  - [Serverless Framework](#serverless-framework)
 
 ---
 
 ## Overview
 
-This document outlines the best practices, conventions, and standards used in the LTI backend application. The backend follows Domain-Driven Design (DDD) principles and implements a layered architecture to ensure code consistency, maintainability, and scalability.
+This document outlines the best practices, conventions, and standards for the Python backend application. The backend follows Domain-Driven Design (DDD) principles and implements a layered architecture to ensure code consistency, testability, maintainability, and scalability.
 
 ## Technology Stack
 
 ### Core Technologies
-- **Node.js**: Runtime environment
-- **TypeScript**: Type-safe development with strict mode
-- **Express.js**: Web application framework
-- **Prisma**: Modern ORM for database access
+- **Python**: Python 3.11+ with full type annotations
+- **Web Framework**: FastAPI (or your chosen async/sync HTTP framework)
+- **Validation & Serialization**: Pydantic v2
 
 ### Database & ORM
-- **PostgreSQL**: Relational database (Docker container)
-- **Prisma Client**: Type-safe database client
-- **Prisma Migrate**: Database migration tool
+- **Database**: PostgreSQL (or SQLite for local/embedded workflows)
+- **ORM**: SQLAlchemy 2.0
+- **Migrations**: Alembic
 
 ### Testing Framework
-- **Jest**: Testing framework with TypeScript support
-- **Coverage Threshold**: 90% for branches, functions, lines, and statements
-- **Test Location**: `__tests__` directories and `.test.ts` files
+- **Test Runner**: `pytest` (with `pytest-asyncio` where async endpoints/services are tested)
+- **Coverage Threshold**: 90% for branches, functions/lines, and statements (`pytest --cov`)
+- **Test Location**: `tests/` directory mirroring `src/` using `test_*.py` files
 
 ### Development Tools
-- **ESLint**: Code linting
-- **TypeScript Compiler**: Type checking and compilation
-- **Serverless Framework**: AWS Lambda deployment support
+- **Linter & Formatter**: Ruff (`ruff check`, `ruff format`)
+- **Static Type Checker**: mypy (`mypy src`)
+- **Package & Environment Management**: `uv` or `poetry` configured in `pyproject.toml`
 
 ## Architecture Overview
 
 ### Domain-Driven Design (DDD)
 
-Domain-Driven Design is a methodology that focuses on modeling software according to business logic and domain knowledge. By centering development on a deep understanding of the domain, DDD facilitates the creation of complex systems.
+Domain-Driven Design centers software modeling on business logic and domain rules rather than framework or database mechanics.
 
 **Benefits:**
-- **Improved Communication**: Promotes a common language between developers and domain experts, improving communication and reducing interpretation errors.
-- **Clear Domain Models**: Helps build models that accurately reflect business rules and processes.
-- **High Maintainability**: By dividing the system into subdomains, it facilitates maintenance and software evolution.
+- **Shared Ubiquitous Language**: Aligns code terms with domain concepts across engineers and stakeholders.
+- **Clear Domain Models**: Keeps business invariants and state transitions explicit in domain types.
+- **High Maintainability**: Isolates core business rules from transport, serialization, and persistence details.
 
 ### Layered Architecture
 
 The backend follows a layered DDD architecture:
 
 **Presentation Layer** (`src/presentation/`)
-- Controllers handle HTTP requests/responses
-- Routes define API endpoints
-- Controllers use services from Application layer
+- Routers/controllers parse HTTP requests and format HTTP responses
+- Delegates use cases to the Application layer
+- Maps domain/application errors to HTTP status codes
 
 **Application Layer** (`src/application/`)
-- Services contain business logic and orchestration
-- Validator handles input validation
-- Services use repositories from Domain layer
+- Use-case/application services orchestrate workflows and transactions
+- Request/response schemas and input validators live here or at the boundary
+- Services depend on domain models and repository protocols/interfaces
 
 **Domain Layer** (`src/domain/`)
-- Models define core business entities (Candidate, Position, Application, Interview, etc.)
-- Repository interfaces define data access contracts
-- Pure business logic without external dependencies
+- Entities, value objects, aggregates, and domain services
+- Repository interfaces (`typing.Protocol` or `abc.ABC`) defining persistence contracts
+- Pure business logic without HTTP or ORM framework coupling
 
-**Infrastructure Layer** (implicit)
-- Prisma ORM handles database operations
-- Repository implementations (via Prisma) satisfy domain interfaces
+**Infrastructure Layer** (`src/infrastructure/`)
+- ORM models, database session/engine setup, and repository implementations
+- External integrations (APIs, file storage, queues) and structured logging
 
 ### Project Structure
 
-```
+```text
 backend/
 ├── src/
 │   ├── domain/
-│   │   ├── models/          # Domain entities
-│   │   └── repositories/    # Repository interfaces
+│   │   ├── models/          # Domain entities, value objects, aggregates
+│   │   ├── repositories/    # Repository protocols/interfaces
+│   │   └── services/        # Pure domain services
 │   ├── application/
-│   │   ├── services/        # Business logic services
-│   │   └── validator.ts     # Input validation
+│   │   ├── services/        # Application / use-case services
+│   │   ├── schemas/         # DTOs / Pydantic schemas
+│   │   └── validators.py    # Domain/input validation helpers
 │   ├── presentation/
-│   │   └── controllers/     # HTTP request handlers
+│   │   ├── api/             # Route handlers / controllers
+│   │   └── middleware/      # Auth, error handling, request logging middleware
 │   ├── infrastructure/
-│   │   ├── logger.ts        # Logging utilities
-│   │   └── prismaClient.ts  # Prisma client setup
-│   ├── routes/              # Express route definitions
-│   ├── middleware/          # Express middleware
-│   ├── index.ts             # Application entry point
-│   └── lambda.ts            # AWS Lambda handler
-├── prisma/
-│   ├── schema.prisma        # Database schema
-│   └── migrations/          # Database migrations
-├── test-utils/
-│   ├── builders/            # Test data builders
-│   └── mocks/               # Mock helpers
-├── jest.config.js           # Jest configuration
-├── tsconfig.json            # TypeScript configuration
-├── serverless.yml           # Serverless Framework config
-└── package.json             # Dependencies and scripts
+│   │   ├── db/              # Engine, session factory, ORM models, repositories
+│   │   └── logging.py       # Structured logger setup
+│   ├── config.py            # Settings loaded from environment
+│   └── main.py              # Application entry point
+├── alembic/
+│   └── versions/            # Database migration scripts
+├── tests/
+│   ├── unit/                # Unit tests (test_*.py)
+│   ├── integration/         # Repository / API integration tests
+│   └── conftest.py          # Shared fixtures and test helpers
+├── pyproject.toml           # Dependencies, ruff, mypy, pytest config
+└── alembic.ini              # Alembic configuration
+
 ```
 
 ## Domain-Driven Design Principles
 
 ### Entities
 
-Entities are objects with a distinct identity that persists over time.
+Entities represent domain concepts with a distinct identity that persists across state changes.
 
 **Before:**
-```typescript
-// Previously, candidate data might have been handled as a simple JSON object without methods.
-const candidate = {
-    id: 1,
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com'
-};
+
+```python
+# Raw dictionary without encapsulated domain rules
+item = {
+    "id": 1,
+    "title": "Draft notes",
+    "completed": False,
+}
+
 ```
 
 **After:**
-```typescript
-export class Candidate {
-    id?: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-    
-    // Constructor and methods that encapsulate business logic
-    constructor(data: any) {
-        this.id = data.id;
-        this.firstName = data.firstName;
-        this.lastName = data.lastName;
-        this.email = data.email;
-    }
-}
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class TaskItem:
+    id: int | None
+    title: str
+    completed: bool = False
+
+    def mark_completed(self) -> None:
+        if not self.title.strip():
+            raise ValueError("Cannot complete a task with an empty title")
+        self.completed = True
+
 ```
 
-**Explanation**: `Candidate` is an entity because it has a unique identifier (`id`) that distinguishes it from other candidates, even if other properties are identical.
+**Explanation**: `TaskItem` has a unique `id` identity and encapsulates state transition rules (`mark_completed`) instead of exposing mutable dictionaries everywhere.
 
-**Best Practice**: Entities should encapsulate business logic related to their domain concept and maintain consistency of their internal state.
+**Best Practice**: Keep invariants inside domain entities and raise domain/value errors when state rules are violated.
 
 ### Value Objects
 
-Value Objects describe aspects of the domain without conceptual identity. They are defined by their attributes rather than an identifier.
+Value Objects are immutable objects defined by their attributes rather than an identity.
 
 **Before:**
-```typescript
-// Handling education information as a simple object
-const education = {
-    institution: 'University',
-    degree: 'Bachelor',
-    startDate: '2010-01-01',
-    endDate: '2014-01-01'
-};
+
+```python
+# Loose tuple or dict representing an external identifier
+deck_ref = {"deck_id": 42}
+
 ```
 
 **After:**
-```typescript
-export class Education {
-    institution: string;
-    title: string;
-    startDate: Date;
-    endDate?: Date;
-    
-    constructor(data: any) {
-        this.institution = data.institution;
-        this.title = data.title;
-        this.startDate = new Date(data.startDate);
-        this.endDate = data.endDate ? new Date(data.endDate) : undefined;
-    }
-}
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class DeckId:
+    value: int
+
+    def __post_init__(self) -> None:
+        if self.value <= 0:
+            raise ValueError("Deck ID must be a positive integer")
+
 ```
 
-**Explanation**: `Education` can be considered a Value Object in some contexts, as it describes a candidate's education without needing a unique identifier. However, in the current model, it has been assigned an id, which could contradict the pure definition of a Value Object in DDD.
+**Explanation**: `DeckId` is immutable (`frozen=True`), self-validating, and compared by value rather than object identity.
 
-**Recommendation**: Classes like `Education` and `WorkExperience` currently have unique identifiers, classifying them as entities. In many cases, these could be treated as Value Objects within the context of a `Candidate` aggregate. Consider removing unique identifiers from classes that should be Value Objects, or incorporating them as part of the Candidate document if using a NoSQL database.
+**Recommendation**: Use `@dataclass(frozen=True)` for value objects and validate constraints in `__post_init__`.
 
 ### Aggregates
 
-Aggregates are clusters of objects that must be treated as a unit. They have a root entity that enforces invariants and consistency boundaries.
+Aggregates group related entities and value objects behind an aggregate root that enforces consistency boundaries.
 
 **Before:**
-```typescript
-// Candidate and education data handled separately
-const candidate = { id: 1, name: 'John Doe' };
-const educations = [{ candidateId: 1, institution: 'University' }];
+
+```python
+# Mutating child records directly outside the parent boundary
+cards.append({"deck_id": 1, "front": "Q", "back": "A"})
+
 ```
 
 **After:**
-```typescript
-export class Candidate {
-    id?: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-    educations: Education[];
-    
-    constructor(data: any) {
-        this.id = data.id;
-        this.firstName = data.firstName;
-        this.lastName = data.lastName;
-        this.email = data.email;
-        this.educations = data.educations?.map(edu => new Education(edu)) || [];
-    }
-}
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Flashcard:
+    front: str
+    back: str
+
+
+@dataclass
+class Deck:
+    id: int | None
+    name: str
+    cards: list[Flashcard] = field(default_factory=list)
+
+    def add_card(self, front: str, back: str) -> Flashcard:
+        if not front.strip() or not back.strip():
+            raise ValueError("Front and back text must be non-empty")
+        card = Flashcard(front=front.strip(), back=back.strip())
+        self.cards.append(card)
+        return card
+
 ```
 
-**Explanation**: `Candidate` acts as an aggregate root that contains `Education`, `WorkExperience`, `Resume`, and `Application`. `Candidate` is the root of the aggregate, as the other entities only make sense in relation to a candidate.
+**Explanation**: `Deck` acts as the aggregate root, ensuring every added card satisfies domain rules before entering the collection.
 
-**Recommendation**: Aggregates should be carefully designed to ensure that all operations within the aggregate boundary maintain consistency. Operations that affect `Education` and `WorkExperience` should be handled through the aggregate root, `Candidate`, to maintain integrity and encapsulation.
+**Recommendation**: Modify child entities through aggregate root methods rather than mutating internal lists directly from outside.
 
 ### Repositories
 
-Repositories provide interfaces for accessing aggregates and entities, encapsulating data access logic.
+Repositories abstract data access behind domain interfaces so application services do not depend on SQL or ORM specifics.
 
 **Before:**
-```typescript
-// Direct database access without abstraction
-function getCandidateById(id: number) {
-    return database.query('SELECT * FROM candidates WHERE id = ?', [id]);
-}
+
+```python
+# Direct ORM query inside a business service
+def get_user(session, user_id: int):
+    return session.query(UserORM).filter(UserORM.id == user_id).first()
+
 ```
 
 **After:**
-```typescript
-export interface ICandidateRepository {
-    findById(id: number): Promise<Candidate | null>;
-    save(candidate: Candidate): Promise<Candidate>;
-    findAll(): Promise<Candidate[]>;
-}
 
-export class CandidateRepository implements ICandidateRepository {
-    async findById(id: number): Promise<Candidate | null> {
-        const data = await prisma.candidate.findUnique({ where: { id } });
-        return data ? new Candidate(data) : null;
-    }
-    
-    async save(candidate: Candidate): Promise<Candidate> {
-        // Implementation with Prisma
-    }
-}
+```python
+from typing import Protocol
+
+
+class UserRepository(Protocol):
+    async def get_by_id(self, user_id: int) -> User | None: ...
+    async def save(self, user: User) -> User: ...
+
 ```
 
-**Explanation**: `CandidateRepository` provides a clear interface for accessing candidate data, encapsulating database access logic.
+**Explanation**: Defining `UserRepository` as a `Protocol` in the domain layer lets infrastructure provide concrete implementations while keeping services decoupled.
 
-**Recommendation**: 
-- Develop complete repository interfaces for each entity and aggregate, ensuring all database interactions for those entities pass through the repository
-- Implement repository methods that handle collections of entities, such as lists of Candidates, that can be filtered or modified in bulk
-- Use dependency injection to inject Prisma client into repositories
+**Recommendation**: Keep repository interfaces focused on domain collections and aggregates, and inject implementations into application services.
 
 ### Domain Services
 
-Domain Services contain business logic that doesn't naturally belong to an entity or value object.
+Domain Services hold stateless domain logic that spans multiple entities or does not naturally belong to a single entity.
 
 **Before:**
-```typescript
-// Loose functions to handle business logic
-function calculateAge(candidate: any): number {
-    const today = new Date();
-    const birthDate = new Date(candidate.birthDate);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    return age;
-}
+
+```python
+# Procedural helper scattered across modules
+def calc_score(correct: int, total: int) -> float:
+    return (correct / total) * 100 if total else 0.0
+
 ```
 
 **After:**
-```typescript
-export class CandidateService {
-    static calculateAge(candidate: Candidate): number {
-        const today = new Date();
-        const birthDate = new Date(candidate.birthDate);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-        return age;
-    }
-}
+
+```python
+class ScoringPolicy:
+    @staticmethod
+    def calculate_percentage(correct: int, total: int) -> float:
+        if total < 0 or correct < 0:
+            raise ValueError("Counts cannot be negative")
+        if total == 0:
+            return 0.0
+        return round((correct / total) * 100, 2)
+
 ```
 
-**Explanation**: `CandidateService` encapsulates business logic related to candidates, such as calculating age, providing a centralized and coherent point for handling these operations.
+**Explanation**: Centralizes domain calculation rules in one place with explicit guard conditions.
 
 ### Additional Recommendations
 
-**Use of Factories**
-
-Factories are useful in DDD to encapsulate the logic of creating complex objects, ensuring that all created objects comply with domain rules from the moment of creation.
-
-**Recommendation**: Implement factories for the creation of entities and aggregates, especially those that are complex and require specific initial configuration that complies with business rules.
-
-**Improvement in Relationship Modeling**
-
-Relationships between entities and aggregates must be clear and consistent with business rules.
-
-**Recommendation**: Review and possibly redesign relationships between entities to ensure they accurately reflect domain needs and rules. This may include removing unnecessary relationships or adding new relationships that facilitate business operations.
-
-**Domain Events Integration**
-
-Domain events are an important part of DDD and can be used to handle side effects of domain operations in a decoupled manner.
-
-**Recommendation**: Implement a domain event system that allows entities and aggregates to publish events that other system components can handle without being tightly coupled to the entities that generate them.
+* **Factories**: Use factory functions or classmethods when constructing complex aggregates that require multi-step validation or default setup.
+* **Relationship Modeling**: Model only relationships needed by business invariants and queries; avoid bidirectional cycles unless required.
+* **Domain Events**: Emit domain events from aggregates/services when side effects (notifications, audit logs, downstream jobs) should stay decoupled.
 
 ## SOLID and DRY Principles
 
-### SOLID Principles
+### Single Responsibility Principle (SRP)
 
-SOLID principles are five object-oriented design principles that help create more understandable, flexible, and maintainable systems.
-
-#### Single Responsibility Principle (SRP)
-
-Each class should have a single responsibility or reason to change.
+Each class, module, or function should have one clear reason to change.
 
 **Before:**
-```typescript
-// A method that handles multiple responsibilities: validation and data storage
-function processCandidate(candidate: any) {
-    if (!candidate.email.includes('@')) {
-        console.error('Invalid email');
-        return;
-    }
-    database.save(candidate);
-    console.log('Candidate saved');
-}
+
+```python
+def create_and_notify_user(payload: dict, db, mailer):
+    if "@" not in payload.get("email", ""):
+        raise ValueError("Invalid email")
+    record = db.add_user(payload)
+    mailer.send_welcome(record.email)
+    return record
+
 ```
 
 **After:**
-```typescript
-export class Candidate {
-    // The class now only handles logic related to the candidate
-    validateEmail(): void {
-        if (!this.email.includes('@')) {
-            throw new Error('Invalid email');
-        }
-    }
-}
 
-export class CandidateRepository {
-    async save(candidate: Candidate): Promise<Candidate> {
-        candidate.validateEmail();
-        return await prisma.candidate.create({ data: candidate });
-    }
-}
+```python
+class UserRegistrationService:
+    def __init__(self, repo: UserRepository, notifier: WelcomeNotifier) -> None:
+        self._repo = repo
+        self._notifier = notifier
+
+    async def register(self, email: str, name: str) -> User:
+        user = User.create(email=email, name=name)
+        saved = await self._repo.save(user)
+        await self._notifier.send_welcome(saved)
+        return saved
+
 ```
 
-**Explanation**: The `Candidate` class now has separate methods for validation, while the repository handles data persistence, complying with the single responsibility principle.
+**Explanation**: Validation/creation lives in `User`, persistence in `UserRepository`, notification in `WelcomeNotifier`, and orchestration in `UserRegistrationService`.
 
-**Observation**: The `Candidate` class in `backend/src/domain/models/Candidate.ts` handles both business logic and data access logic.
+### Open/Closed Principle (OCP)
 
-**Recommendation**: Separate data access logic into a repository layer to adhere more closely to SRP.
-
-#### Open/Closed Principle (OCP)
-
-Software entities should be open for extension but closed for modification.
+Software modules should be open for extension without modifying existing tested code.
 
 **Before:**
-```typescript
-// Direct modification of the class to add functionality
-class Candidate {
-    saveToDatabase() {
-        // code to save to database
-    }
-    // To add new functionality, we modify the class directly
-    sendEmail() {
-        // code to send an email
-    }
-}
+
+```python
+def export_deck(fmt: str, deck: Deck) -> bytes:
+    if fmt == "json":
+        return b"..."
+    if fmt == "csv":
+        return b"..."
+    raise ValueError(f"Unsupported format: {fmt}")
+
 ```
 
 **After:**
-```typescript
-export class Candidate {
-    saveToDatabase() {
-        // code to save to database
-    }
-}
 
-// Extend functionality without modifying the existing class
-class CandidateWithEmail extends Candidate {
-    sendEmail() {
-        // code to send an email
-    }
-}
+```python
+from typing import Protocol
+
+
+class DeckExporter(Protocol):
+    def export(self, deck: Deck) -> bytes: ...
+
+
+class JsonDeckExporter:
+    def export(self, deck: Deck) -> bytes:
+        return b"..."
+
 ```
 
-**Explanation**: The email sending functionality is extended in a subclass, keeping the original class closed for modifications but open for extensions.
+**Explanation**: Adding a new export format means adding a new `DeckExporter` implementation rather than editing a growing `if/elif` branch.
 
-**Observation**: The `addCandidate` function in `backend/src/application/services/candidateService.ts` directly instantiates `Candidate`, `Education`, `WorkExperience`, and `Resume` classes.
+### Liskov Substitution Principle (LSP)
 
-**Recommendation**: Use factory methods to create instances, allowing for easier extension without modifying existing code.
-
-#### Liskov Substitution Principle (LSP)
-
-Objects of a derived class should be replaceable with objects of the base class without altering the program's functionality.
+Subtypes and protocol implementations must be usable wherever their base type or protocol is expected without breaking invariants or raising unexpected errors.
 
 **Before:**
-```typescript
-// Subclass that cannot completely replace its base class
-class TemporaryCandidate extends Candidate {
-    saveToDatabase() {
-        throw new Error("Temporary candidates can't be saved.");
-    }
-}
+
+```python
+class ReadOnlyStore:
+    def save(self, item: object) -> None:
+        raise NotImplementedError("Read-only store cannot save")
+
 ```
 
 **After:**
-```typescript
-class TemporaryCandidate extends Candidate {
-    saveToDatabase() {
-        // Appropriate implementation that allows temporary handling
-        console.log("Handled temporarily");
-        // Alternative: Save to temporary storage
-    }
-}
+
+```python
+class ItemReader(Protocol):
+    def get(self, item_id: int) -> object | None: ...
+
+
+class ItemWriter(Protocol):
+    def save(self, item: object) -> None: ...
+
 ```
 
-**Explanation**: `TemporaryCandidate` now provides an appropriate implementation that respects the base class contract, allowing substitution without errors.
+**Explanation**: Splitting read and write protocols avoids forcing read-only implementations to throw `NotImplementedError`.
 
-**Observation**: Currently, there is no inheritance in use where LSP could be violated. The project uses composition over inheritance, which generally supports LSP.
+### Interface Segregation Principle (ISP)
 
-**Recommendation**: Continue using composition to avoid LSP violations and ensure that any future inheritance structures allow derived classes to substitute their base classes without altering how the program works.
-
-#### Interface Segregation Principle (ISP)
-
-Many specific interfaces are better than a single general interface.
+Prefer small, focused protocols/interfaces over large ones that force callers or implementations to depend on unused methods.
 
 **Before:**
-```typescript
-// A large interface that small clients don't fully use
-interface CandidateOperations {
-    save(): void;
-    validate(): void;
-    sendEmail(): void;
-    generateReport(): void;
-}
+
+```python
+class StorageClient(Protocol):
+    def upload(self, path: str, data: bytes) -> None: ...
+    def download(self, path: str) -> bytes: ...
+    def delete(self, path: str) -> None: ...
+    def list_buckets(self) -> list[str]: ...
+
 ```
 
 **After:**
-```typescript
-interface SaveOperation {
-    save(): void;
-}
 
-interface EmailOperations {
-    sendEmail(): void;
-}
+```python
+class FileUploader(Protocol):
+    def upload(self, path: str, data: bytes) -> None: ...
 
-interface ReportOperations {
-    generateReport(): void;
-}
 
-class Candidate implements SaveOperation, EmailOperations {
-    save() {
-        // implementation
-    }
-    
-    sendEmail() {
-        // implementation
-    }
-}
+class FileDownloader(Protocol):
+    def download(self, path: str) -> bytes: ...
+
 ```
 
-**Explanation**: Interfaces are segregated into smaller operations, allowing classes to implement only the interfaces they need.
+**Explanation**: Consumers only declare the exact capability (`FileUploader` or `FileDownloader`) they need, making fakes and mocks smaller in tests.
 
-**Observation**: The project does not currently use TypeScript interfaces extensively to enforce contracts for classes.
+### Dependency Inversion Principle (DIP)
 
-**Recommendation**: Define more granular interfaces for service classes to ensure they only implement the methods they need.
-
-#### Dependency Inversion Principle (DIP)
-
-High-level modules should not depend on low-level modules; both should depend on abstractions.
+High-level policy and application logic should depend on abstractions (`Protocol`/`ABC`), not concrete infrastructure clients.
 
 **Before:**
-```typescript
-// Direct dependency on a concrete implementation
-class Candidate {
-    private database = new PrismaClient();
-    
-    save() {
-        this.database.candidate.create({ data: this });
-    }
-}
+
+```python
+class ReportService:
+    def __init__(self) -> None:
+        self.client = httpx.AsyncClient()  # Tightly coupled concrete dependency
+
 ```
 
 **After:**
-```typescript
-interface Database {
-    save(candidate: Candidate): Promise<Candidate>;
-}
 
-class Candidate {
-    private database: Database;
-    
-    constructor(database: Database) {
-        this.database = database;
-    }
-    
-    async save(): Promise<Candidate> {
-        return await this.database.save(this);
-    }
-}
+```python
+class ReportService:
+    def __init__(self, fetcher: MetricsFetcher) -> None:
+        self._fetcher = fetcher
+
 ```
 
-**Explanation**: `Candidate` now depends on an abstraction (Database), not a concrete implementation, which facilitates flexibility and code testing.
-
-**Observation**: Classes like `Candidate` directly depend on the concrete `PrismaClient` for database operations.
-
-**Recommendation**: Use dependency injection to invert the dependency, relying on abstractions rather than concrete implementations. Inject `PrismaClient` through the constructor or a setter method.
+**Explanation**: Injecting `MetricsFetcher` makes `ReportService` easy to test and swap across environments.
 
 ### DRY (Don't Repeat Yourself)
 
-The DRY principle focuses on reducing duplication in code. Each piece of knowledge should have a single, unambiguous, and authoritative representation within a system.
+Consolidate repeated business rules, queries, or serialization logic into shared helpers or base components.
 
 **Before:**
-```typescript
-// Repeated code to validate emails in multiple functions
-function saveCandidate(candidate: Candidate) {
-    if (!candidate.email.includes('@')) {
-        throw new Error('Invalid email');
-    }
-    // save logic
-}
 
-function updateCandidate(candidate: Candidate) {
-    if (!candidate.email.includes('@')) {
-        throw new Error('Invalid email');
-    }
-    // update logic
-}
+```python
+def create_item(name: str) -> str:
+    cleaned = name.strip()
+    if not cleaned:
+        raise ValueError("Name is required")
+    return cleaned
+
+def rename_item(name: str) -> str:
+    cleaned = name.strip()
+    if not cleaned:
+        raise ValueError("Name is required")
+    return cleaned
+
 ```
 
 **After:**
-```typescript
-export class Candidate {
-    validateEmail(): void {
-        if (!this.email.includes('@')) {
-            throw new Error('Invalid email');
-        }
-    }
-    
-    async save(): Promise<Candidate> {
-        this.validateEmail();
-        // save logic
-    }
-    
-    async update(): Promise<Candidate> {
-        this.validateEmail();
-        // update logic
-    }
-}
+
+```python
+def normalize_required_name(name: str) -> str:
+    cleaned = name.strip()
+    if not cleaned:
+        raise ValueError("Name is required")
+    return cleaned
+
 ```
 
-**Explanation**: Email validation is centralized in a single `validateEmail` method, eliminating code duplication in the save and update functions.
-
-**Observation**: The methods for saving entities like `Candidate`, `Education`, `WorkExperience`, and `Resume` contain repetitive logic for handling database operations.
-
-**Recommendation**: Abstract common database operation logic into a reusable function or class.
+**Explanation**: Centralizes normalization and validation in a single helper function.
 
 ## Coding Standards
 
 ### Naming Conventions
 
-- **Variable Naming**: Use camelCase for variables and functions (e.g., `candidateId`, `findCandidateById`)
-- **Class Naming**: Use PascalCase for classes and interfaces (e.g., `Candidate`, `CandidateRepository`)
-- **Constants Naming**: Use UPPER_SNAKE_CASE for constants (e.g., `MAX_CANDIDATES_PER_PAGE`)
-- **Type Naming**: Use PascalCase for types and interfaces (e.g., `CandidateData`, `ICandidateRepository`)
-- **File Naming**: Use camelCase for file names (e.g., `candidateService.ts`, `candidateController.ts`)
+* **Variables & Functions**: `snake_case` (e.g., `deck_id`, `get_user_by_id`)
+* **Classes & Protocols**: `PascalCase` (e.g., `TaskItem`, `UserRepository`)
+* **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_BATCH_SIZE`)
+* **Modules & Packages**: `snake_case` (e.g., `task_service.py`, `user_repository.py`)
+* **Language**: Write code, identifiers, docstrings, comments, error messages, and logs in English consistently.
 
-**Examples:**
+```python
+# Good
+async def find_candidate_by_id(candidate_id: int, repo: CandidateRepository) -> Candidate | None:
+    return await repo.get_by_id(candidate_id)
 
-```typescript
-// Good: All in English
-export class CandidateRepository {
-    async findById(candidateId: number): Promise<Candidate | null> {
-        // Find candidate by ID in the database
-        const candidate = await this.prisma.candidate.findUnique({
-            where: { id: candidateId }
-        });
-        return candidate ? new Candidate(candidate) : null;
-    }
-}
+# Avoid: Non-English identifiers, comments, or log messages
+async def buscar_candidato(id_candidato: int):
+    # Buscar candidato por ID
+    return None
 
-// Avoid: Non-English comments or names
-export class RepositorioCandidato {
-    async buscarPorId(idCandidato: number): Promise<Candidato | null> {
-        // Buscar candidato por ID en la base de datos
-        const candidato = await this.prisma.candidate.findUnique({
-            where: { id: idCandidato }
-        });
-        return candidato ? new Candidato(candidato) : null;
-    }
-}
 ```
 
-**Error Messages and Logs:**
+### Type Hints & Typing
 
-```typescript
-// Good: English error messages
-throw new NotFoundError('Candidate not found with the provided ID');
-logger.error('Failed to create candidate', { error: error.message });
+* **Strict Typing**: Enable strict/ thorough checking in `mypy` (`disallow_untyped_defs = true`, `warn_return_any = true`).
+* **Explicit Signatures**: Annotate all function parameters and return types.
+* **Modern Syntax**: Use `X | None`, `list[str]`, and `dict[str, Any]` (Python 3.11+).
+* **Avoid `Any**`: Prefer explicit models, `Protocol`s, or narrowing over `Any`.
 
-// Avoid: Non-English messages
-throw new NotFoundError('Candidato no encontrado con el ID proporcionado');
-logger.error('Error al crear candidato', { error: error.message });
-```
+```python
+# Good
+def parse_ids(raw_ids: list[str]) -> list[int]:
+    return [int(item) for item in raw_ids]
 
-### TypeScript Usage
+# Avoid
+def parse_ids(raw_ids):
+    return [int(item) for item in raw_ids]
 
-- **Strict Mode**: Always enable strict mode in `tsconfig.json`
-- **Type Definitions**: Use explicit types for function parameters and return values
-- **Interfaces**: Define interfaces for complex data structures
-- **Avoid `any`**: Use `unknown` or specific types instead of `any` when possible
-
-```typescript
-// Good: Explicit types
-async function findCandidateById(id: number): Promise<Candidate | null> {
-    // implementation
-}
-
-// Avoid: Using any
-function processData(data: any): any {
-    // implementation
-}
 ```
 
 ### Error Handling
 
-- **Custom Error Classes**: Create domain-specific error classes
-- **Error Middleware**: Use global error middleware for consistent error responses
-- **Error Messages**: Provide descriptive error messages for debugging
+* **Custom Exceptions**: Define explicit domain/application exception classes (`NotFoundError`, `ValidationError`, `ConflictError`).
+* **Centralized Translation**: Map custom exceptions to HTTP status codes in a single global exception handler/middleware rather than repeating `try/except` HTTP responses in every route.
+* **Preserve Context**: Use `raise ... from exc` when chaining exceptions.
 
-```typescript
-export class NotFoundError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'NotFoundError';
-    }
-}
+```python
+class NotFoundError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
 
-// In controller
-try {
-    const candidate = await candidateService.findById(id);
-    if (!candidate) {
-        throw new NotFoundError('Candidate not found');
-    }
-    res.json(candidate);
-} catch (error) {
-    next(error);
-}
 ```
 
 ### Validation Patterns
 
-- **Input Validation**: Validate all inputs at the application layer
-- **Use Validator Module**: Centralize validation logic in `src/application/validator.ts`
-- **Validate Before Processing**: Always validate before executing business logic
+* **Boundary Validation**: Validate incoming payloads and query parameters at the API/application boundary using Pydantic schemas.
+* **Domain Invariants**: Enforce business rules inside domain models/services before persisting state.
 
-```typescript
-import { validateCandidateData } from '../application/validator';
+```python
+from pydantic import BaseModel, Field
 
-export async function addCandidate(req: Request, res: Response, next: NextFunction) {
-    try {
-        const validatedData = validateCandidateData(req.body);
-        const candidate = await candidateService.create(validatedData);
-        res.status(201).json(candidate);
-    } catch (error) {
-        next(error);
-    }
-}
+
+class CreateDeckRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    target_deck_id: int = Field(gt=0)
+
 ```
 
 ### Logging Standards
 
-- **Use Logger Class**: Use the centralized logger from `src/infrastructure/logger.ts`
-- **Log Levels**: Use appropriate log levels (info, error, warn, debug)
-- **Structured Logging**: Include relevant context in log messages
+* **Centralized Logger**: Use `logging.getLogger(__name__)` configured via `src/infrastructure/logging.py`.
+* **Appropriate Levels**: Use `debug`, `info`, `warning`, and `error` accurately.
+* **Structured Context**: Include relevant IDs and context without logging secrets, tokens, or PII.
 
-```typescript
-import { Logger } from '../infrastructure/logger';
+```python
+import logging
 
-const logger = new Logger();
+logger = logging.getLogger(__name__)
 
-logger.info('Candidate created', { candidateId: candidate.id });
-logger.error('Failed to create candidate', { error: error.message });
+logger.info("Deck export completed", extra={"deck_id": 42, "card_count": 15})
+logger.error("Failed to generate deck export", extra={"deck_id": 42})
+
 ```
 
 ## API Design Standards
 
 ### REST Endpoints
 
-- **RESTful Naming**: Use RESTful conventions for endpoint naming
-- **HTTP Methods**: Use appropriate HTTP methods (GET, POST, PUT, DELETE, PATCH)
-- **Resource-Based URLs**: URLs should represent resources, not actions
+* **Resource Nouns**: Use plural nouns for collections (`/api/v1/decks`, `/api/v1/decks/{deck_id}`).
+* **HTTP Verbs**: Use `GET`, `POST`, `PUT`/`PATCH`, and `DELETE` according to semantics.
+* **Versioning**: Prefix routes under `/api/v1`.
 
-```typescript
-GET    /candidates          // List candidates
-GET    /candidates/:id      // Get candidate by ID
-POST   /candidates          // Create new candidate
-PUT    /candidates/:id      // Update candidate
-DELETE /candidates/:id      // Delete candidate
+```text
+GET    /api/v1/decks              # List decks
+GET    /api/v1/decks/{deck_id}    # Retrieve a single deck
+POST   /api/v1/decks              # Create a deck
+PATCH  /api/v1/decks/{deck_id}    # Update deck fields
+DELETE /api/v1/decks/{deck_id}    # Delete a deck
+
 ```
 
 ### Request/Response Patterns
 
-- **JSON Format**: Use JSON for request and response bodies
-- **Consistent Structure**: Maintain consistent response structure across all endpoints
-- **Status Codes**: Use appropriate HTTP status codes
+* **JSON Payloads**: Use JSON for request and response bodies.
+* **Consistent Envelope**: Return a consistent response structure across endpoints.
+* **Status Codes**: Use accurate HTTP status codes (`200`, `201`, `204`, `400`, `404`, `422`, `500`).
 
-```typescript
-// Success response
+```json
 {
-    "success": true,
-    "data": { ... },
-    "message": "Operation completed successfully"
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Biology 101"
+  },
+  "message": "Deck created successfully"
 }
 
-// Error response
-{
-    "success": false,
-    "error": {
-        "message": "Error description",
-        "code": "ERROR_CODE"
-    }
-}
 ```
 
 ### Error Response Format
 
-- **Consistent Format**: All errors should follow the same response structure
-- **Error Codes**: Use meaningful error codes for different error types
-- **HTTP Status Codes**: Map errors to appropriate HTTP status codes
+* **Standardized Error Shape**: Return consistent error payloads with a clear message, machine-readable code, and optional field/validation details.
+* **No Internal Leaks**: Never expose raw SQL queries, stack traces, or internal secrets in responses.
 
-```typescript
-// 400 Bad Request
+```json
 {
-    "success": false,
-    "error": {
-        "message": "Validation failed",
-        "code": "VALIDATION_ERROR",
-        "details": [ ... ]
-    }
+  "success": false,
+  "error": {
+    "message": "Deck not found",
+    "code": "NOT_FOUND",
+    "details": []
+  }
 }
 
-// 404 Not Found
-{
-    "success": false,
-    "error": {
-        "message": "Resource not found",
-        "code": "NOT_FOUND"
-    }
-}
 ```
 
 ### CORS Configuration
 
-- **Enable CORS**: Configure CORS to allow frontend origin
-- **Secure Configuration**: Only allow specific origins in production
-- **Credentials**: Configure credentials handling appropriately
-
-```typescript
-import cors from 'cors';
-
-const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
-};
-
-app.use(cors(corsOptions));
-```
+* **Explicit Origins**: Configure allowed origins explicitly via environment variables instead of wildcard `*` with credentials in production.
+* **Methods & Headers**: Restrict allowed methods and headers to what the client actually uses.
 
 ## Database Patterns
 
-### Prisma Schema
+### ORM Models & Schema
 
-- **Single Source of Truth**: `prisma/schema.prisma` is the single source of truth for database structure
-- **Relationships**: Define relationships using Prisma relations
-- **Naming Conventions**: Use consistent naming conventions (camelCase for fields, PascalCase for models)
+* **Single Source of Truth**: Define schema changes in migrations and keep ORM models aligned with the database schema.
+* **Explicit Relationships & Constraints**: Declare foreign keys, indexes, and constraints explicitly.
+* **No Raw SQL in Services**: Encapsulate database queries inside repository implementations.
 
 ### Migrations
 
-- **Version Control**: All database changes must be version-controlled through migrations
-- **Migration Naming**: Use descriptive names for migrations
-- **Review Migrations**: Review migration files before applying
+* **Versioned Migrations**: Every schema change must have a corresponding migration script in `alembic/versions/`.
+* **Descriptive Naming**: Name migrations after the schema change (e.g., `add_decks_table`).
+* **Review Before Applying**: Inspect generated migration scripts before running them in shared or production environments.
 
 ```bash
-# Create migration
-npx prisma migrate dev --name descriptive_migration_name
+alembic revision --autogenerate -m "add_decks_table"
+alembic upgrade head
 
-# Apply migrations in production
-npx prisma migrate deploy
 ```
 
 ### Repository Pattern
 
-- **Repository Interfaces**: Define repository interfaces in the domain layer
-- **Prisma Implementation**: Implement repositories using Prisma in the infrastructure layer
-- **Dependency Injection**: Inject Prisma client into repositories
-
-```typescript
-// Domain layer interface
-export interface ICandidateRepository {
-    findById(id: number): Promise<Candidate | null>;
-    save(candidate: Candidate): Promise<Candidate>;
-}
-
-// Infrastructure layer implementation
-export class CandidateRepository implements ICandidateRepository {
-    constructor(private prisma: PrismaClient) {}
-    
-    async findById(id: number): Promise<Candidate | null> {
-        const data = await this.prisma.candidate.findUnique({ where: { id } });
-        return data ? new Candidate(data) : null;
-    }
-}
-```
+* **Protocol in Domain, Implementation in Infrastructure**: Keep the contract in `src/domain/repositories/` and the SQLAlchemy implementation in `src/infrastructure/db/`.
+* **Explicit Session Injection**: Inject the database session/connection rather than instantiating global sessions inside repository methods.
 
 ## Testing Standards
 
-The project has strict requirements for code quality and maintainability. These are the unit testing standards and best practices that must be applied. 
-
 ### Test File Structure
-- Use descriptive test file names: `[componentName].test.ts`
-- Place test files alongside the source code they test
-- Use Jest as the testing framework with TypeScript support
-- Maintain 90% coverage threshold for branches, functions, lines, and statements
 
+* Name test files `test_<module_or_feature>.py` inside `tests/unit/` or `tests/integration/`.
+* Use `pytest` and fixtures defined in `tests/conftest.py`.
+* Target at least 90% coverage across branches, lines, and statements.
 
 ### Test Organization Pattern
-Template:
-```typescript
-describe('[ComponentName] - [methodName]', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
 
-  describe('should_[expected_behavior]_when_[condition]', () => {
-    it('should [specific test case]', async () => {
-      // Arrange
-      // Act  
-      // Assert
-    });
-  });
-});
+```python
+def test_mark_completed_sets_flag_when_title_is_present() -> None:
+    # Arrange
+    task = TaskItem(id=1, title="Review chapter 3", completed=False)
+
+    # Act
+    task.mark_completed()
+
+    # Assert
+    assert task.completed is True
+
 ```
-
-Real example:
-```typescript
-describe('CandidateService - findById', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-    });
-
-    it('should return candidate when found', async () => {
-        // Arrange
-        const candidateId = 1;
-        const mockCandidate = new Candidate({ id: 1, firstName: 'John' });
-        (CandidateRepository.findById as jest.Mock).mockResolvedValue(mockCandidate);
-
-        // Act
-        const result = await candidateService.findById(candidateId);
-
-        // Assert
-        expect(result).toEqual(mockCandidate);
-        expect(CandidateRepository.findById).toHaveBeenCalledWith(candidateId);
-    });
-});
-```
-
-
 
 ### Test Case Naming Convention
-- Use descriptive, behavior-driven naming: `should_[expected_behavior]_when_[condition]`
-- Group related test cases under descriptive `describe` blocks
-- Use snake_case for describe blocks and camelCase for individual tests
+
+* Use descriptive names explaining behavior and condition: `test_<expected_behavior>_when_<condition>`.
+* Group related tests in classes (`TestTaskItem`) or modules by feature.
 
 ### Test Structure (AAA Pattern)
-Always follow the Arrange-Act-Assert pattern:
-```typescript
-it('should update candidate stage successfully when valid data provided', async () => {
-  // Arrange - Set up test data and mocks
-  const candidateId = 1;
-  const applicationId = 1;
-  const newInterviewStep = 2;
-  
-  // Act - Execute the function under test
-  const result = await updateCandidateStage(candidateId, applicationId, newInterviewStep);
-  
-  // Assert - Verify the expected behavior
-  expect(result).toEqual(expectedResult);
-});
-```
 
-Assertion pattern:
-- Use specific matchers: `toHaveBeenCalledWith()`, `toHaveBeenCalledTimes()`
-- Verify both successful operations and error conditions
-- Check that mocks were called with correct parameters
-- Assert on return values and side effects
+Always structure tests clearly into **Arrange**, **Act**, and **Assert**:
 
-
-
-
-
-
-
-
-### Mocking Standards
-
-- Mock all external dependencies (models, services, database clients)
-- Mock repository layers in service tests
-- Mock service layers in controller tests
-- Use `jest.mock()` at the top of test files for module-level mocking
-- Create mock instances with realistic data structures
-- Clear all mocks in `beforeEach()` to ensure test isolation
-
-
-### Test Coverage Requirements
-
-- **Comprehensive test coverage**: Include these test categories for each function:
-1. **Happy Path Tests**: Valid inputs producing expected outputs
-2. **Error Handling Tests**: Invalid inputs, missing data, database errors
-3. **Edge Cases**: Boundary values, null/undefined inputs, empty data
-4. **Validation Tests**: Input validation, business rule enforcement
-5. **Integration Points**: External service calls, database operations
-
-- **Threshold**: 90% for branches, functions, lines, and statements
-- **Coverage Reports**: Generate coverage reports with `npm run test:coverage`
-- **Coverage Files**: Coverage reports in `coverage/` directory adding the date, like YYYYMMDD-backend-coverage.md
-
-
-### Error Testing
-- Test both expected errors and unexpected errors
-- Verify error messages are descriptive and helpful
-- Test error propagation through service layers
-- Ensure proper HTTP status codes in controller tests
-
-### Controller Testing Specifics
-- Mock the service layer completely
-- Test HTTP request/response handling
-- Verify parameter parsing and validation
-- Test error response formatting
-- Use realistic Express Request/Response mocks
-
-### Service Testing Specifics
-- Mock domain models and repositories
-- Test business logic in isolation
-- Verify data transformation and validation
-- Test error handling and edge cases
-- Mock external dependencies (Prisma, validators)
-
-### Database Testing
-- Mock Prisma client and all database operations
-- Test both successful and failed database operations
-- Verify correct database queries and parameters
-- Test transaction handling and rollback scenarios
-
-### Async Testing
-- Always use `async/await` for asynchronous operations
-- Use `Promise.allSettled()` for testing concurrent operations
-- Properly handle promise rejections in tests
-- Test timeout scenarios where applicable
-
-### Test Data Management
-- Use factory functions for creating test data
-- Keep test data consistent and realistic
-- Avoid hardcoded values in multiple places
-- Use meaningful test data that reflects real-world scenarios
-
-### Integration Testing
-
-- **Controller Testing**: Test HTTP request/response handling
-- **Database Testing**: Test repository implementations with database
-- **End-to-End Flow**: Test complete request flows
-
-
-### Code Quality Standards
-
-#### TypeScript Usage
-- Use strict typing for all test parameters and return values
-- Define proper interfaces for mock data
-- Use type assertions sparingly and with proper justification
-- Leverage TypeScript's type system for better test reliability
-
-#### Documentation
-- Write clear, descriptive test names that explain the scenario
-- Add comments for complex test setups
-- Document any special test conditions or edge cases
-- Keep test code as readable as production code
-
-#### Performance Considerations
-- Keep tests fast and focused
-- Avoid unnecessary async operations in tests
-- Use appropriate mock strategies to avoid real I/O
-- Group related tests to minimize setup/teardown overhead
-
-### Integration with Development Workflow
-- Run tests before every commit
-- Ensure all tests pass before merging
-- Use test-driven development when appropriate
-- Update tests when modifying existing functionality
-
-### Common Anti-Patterns to Avoid
-- Don't test implementation details, test behavior
-- Don't create overly complex test setups
-- Don't ignore failing tests or skip error scenarios
-- Don't use real database connections in unit tests
-- Don't create tests that depend on external services
-- Don't write tests that are too tightly coupled to implementation
-
-### Example Test Structure
-
-
+* **Arrange**: Prepare domain objects, inputs, and test doubles/fakes.
+* **Act**: Invoke the single function, service method, or endpoint under test.
+* **Assert**: Verify return values, state changes, raised exceptions, and collaborator calls.
 
 ## Performance Best Practices
 
 ### Database Query Optimization
 
-- **Select Specific Fields**: Only select fields that are needed
-- **Use Indexes**: Ensure proper database indexes for frequently queried fields
-- **Avoid N+1 Queries**: Use Prisma's `include` to fetch related data efficiently
+* **Avoid N+1 Queries**: Eager-load or batch-fetch related records instead of querying inside loops.
+* **Select Needed Columns**: Avoid fetching unneeded columns or large payloads when listing records.
+* **Index Filter & Join Columns**: Ensure foreign keys and frequent filter predicates are indexed.
 
-```typescript
-// Good: Fetch related data efficiently
-const candidate = await prisma.candidate.findUnique({
-    where: { id },
-    include: {
-        educations: true,
-        workExperiences: true
-    }
-});
+### Async & I/O Patterns
 
-// Avoid: N+1 queries
-const candidate = await prisma.candidate.findUnique({ where: { id } });
-const educations = await prisma.education.findMany({ where: { candidateId: id } });
-```
-
-### Async/Await Patterns
-
-- **Always Use Async/Await**: Use async/await instead of promises chains
-- **Error Handling**: Properly handle errors in async operations
-- **Parallel Operations**: Use `Promise.all()` for parallel operations when appropriate
-
-```typescript
-// Good: Parallel operations
-const [candidates, positions] = await Promise.all([
-    candidateService.findAll(),
-    positionService.findAll()
-]);
-```
+* **Non-Blocking I/O**: Use async I/O (`async def` + async clients/drivers) consistently in async endpoints and services; do not call blocking I/O inside an async event loop without offloading.
+* **Bounded Concurrency**: Use bounded task groups/semaphores when running parallel external calls.
 
 ### Error Handling Performance
 
-- **Early Returns**: Return early to avoid unnecessary processing
-- **Error Propagation**: Let errors propagate naturally through the call stack
-- **Avoid Over-Wrapping**: Don't wrap errors unnecessarily
+* **Use Control Flow, Not Exceptions**: Do not use exceptions for normal branching or expected empty/missing checks where returning `None` or a result is clearer.
+* **Validate Early**: Fail fast on invalid inputs before opening expensive I/O or transactions.
 
 ## Security Best Practices
 
 ### Input Validation
 
-- **Validate All Inputs**: Validate all user inputs before processing
-- **Sanitize Data**: Sanitize data to prevent injection attacks
-- **Type Checking**: Use TypeScript and validation to ensure type safety
+* **Strict Boundary Parsing**: Reject unexpected or malformed inputs at the API boundary.
+* **Safe File & Path Handling**: Validate file types, sizes, and paths; prevent path traversal (`../`) when handling uploads or exports.
 
 ### Environment Variables
 
-- **Never Commit Secrets**: Never commit `.env` files or secrets to version control
-- **Use Environment Variables**: Use environment variables for configuration
-- **Validate Environment**: Validate required environment variables at startup
-
-```typescript
-// Validate required environment variables
-const requiredEnvVars = ['DATABASE_URL', 'PORT'];
-requiredEnvVars.forEach(varName => {
-    if (!process.env[varName]) {
-        throw new Error(`Missing required environment variable: ${varName}`);
-    }
-});
-```
+* **Never Hardcode Secrets**: Load API keys, database URLs, and signing secrets from environment variables / secret stores.
+* **Fail Fast on Missing Config**: Validate required environment settings at startup rather than failing mid-request.
 
 ### Dependency Injection
 
-- **Inject Prisma Client**: Inject Prisma client via Express middleware
-- **Avoid Global State**: Avoid global state for database connections
-- **Testability**: Use dependency injection to improve testability
-
-```typescript
-// Middleware to inject Prisma client
-app.use((req: Request, res: Response, next: NextFunction) => {
-    req.prisma = prisma;
-    next();
-});
-
-// Use in controllers
-export async function getCandidate(req: Request, res: Response) {
-    const candidate = await req.prisma.candidate.findUnique({
-        where: { id: req.params.id }
-    });
-    res.json(candidate);
-}
-```
+* **Explicit Wiring**: Wire dependencies explicitly via framework DI or constructor injection so test doubles can be injected cleanly without monkeypatching internals.
 
 ## Development Workflow
 
 ### Git Workflow
 
-- **Feature Branches**: Develop features in separate branches using clear descriptive names to allow working in parallel and avoid conflicts or collisions
-- **Descriptive Commits**: Write descriptive commit messages in English
-- **Code Review**: Code review before merging
-- **Small Branches**: Keep branches small and focused
+* **Feature Branches**: Create a dedicated branch from the base branch for each task (`feat/<slug>` or `fix/<slug>`).
+* **Small, Scoped Commits**: Keep commits focused on the task with clear commit messages.
 
 ### Development Scripts
 
+Run standard development commands from `backend/`:
+
 ```bash
-npm run dev          # Development server with hot reload
-npm run build        # Build for production
-npm test             # Run tests
-npm run test:coverage # Run tests with coverage
-npm run prisma:generate  # Generate Prisma client
-npx prisma migrate dev   # Create and apply migration
-npx prisma db seed       # Seed database
+# Install dependencies
+uv sync
+
+# Run dev server
+uvicorn src.main:app --reload
+
+# Run tests with coverage
+pytest --cov=src
+
+# Lint & format
+ruff check .
+ruff format --check .
+
+# Type check
+mypy src
+
 ```
 
 ### Code Quality
 
-- **ESLint Validation**: Run ESLint before commits
-- **TypeScript Compilation**: Ensure TypeScript compiles without errors
-- **All Tests Passing**: Ensure all tests pass before deployment
-- **Code Review**: Review code for adherence to standards
+Before marking a task complete, ensure linting, formatting, type checking, and tests pass without unresolved errors.
 
-## Serverless Deployment
-
-### AWS Lambda Configuration
-
-- **Lambda Handler**: Entry point is `src/lambda.ts`
-- **Serverless HTTP**: Use `serverless-http` to wrap Express app
-- **Environment Variables**: Configure environment variables in `serverless.yml`
-
-### Serverless Framework
-
-- **Configuration File**: `serverless.yml` defines Lambda configuration
-- **Build Command**: Use `npm run build:lambda` for Lambda builds
-- **Deployment**: Deploy using Serverless Framework CLI
-
-```typescript
-// lambda.ts
-import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
-import serverless from 'serverless-http';
-import { app } from './index';
-
-const serverlessHandler = serverless(app);
-
-export const handler = async (
-  event: APIGatewayProxyEvent,
-  context: Context
-): Promise<APIGatewayProxyResult> => {
-  context.callbackWaitsForEmptyEventLoop = false;
-  return await serverlessHandler(event, context) as APIGatewayProxyResult;
-};
 ```
-
-This document serves as the foundation for maintaining code quality and consistency across the LTI backend application. All team members should follow these practices to ensure a maintainable, scalable, and testable codebase.
