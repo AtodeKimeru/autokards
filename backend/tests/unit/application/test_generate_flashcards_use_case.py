@@ -5,44 +5,135 @@ import pytest
 from src.application.schemas.generate_flashcards import GenerateFlashcardsRequest
 from src.application.services.generate_flashcards_use_case import (
     GenerateFlashcardsUseCase,
+    get_flashcards_use_case,
 )
-from src.domain.exceptions import ValidationError
+from src.domain.exceptions import (
+    GenerationError,
+    InvalidGeneratorOutputError,
+    ProviderLimitExceededError,
+    ValidationError,
+)
+from src.domain.models.flashcard import Flashcard
+from src.domain.models.study_text import StudyText
+
+
+class FakeGenerator:
+    """Test double implementing the FlashcardGenerator port."""
+
+    def __init__(
+        self,
+        cards: list[Flashcard] | None = None,
+        exc: Exception | None = None,
+    ) -> None:
+        self._cards = cards or []
+        self.exc = exc
+        self.called_with: StudyText | None = None
+
+    async def generate(self, study_text: StudyText) -> tuple[Flashcard, ...]:
+        self.called_with = study_text
+        if self.exc is not None:
+            raise self.exc
+        return tuple(self._cards)
 
 
 class TestGenerateFlashcardsUseCase:
-    def test_stops_flow_without_generating_when_text_is_empty(self) -> None:
+    async def test_stops_flow_without_generating_when_text_is_empty(self) -> None:
         # Arrange
-        use_case = GenerateFlashcardsUseCase()
+        use_case = GenerateFlashcardsUseCase(generator=FakeGenerator())
         request = GenerateFlashcardsRequest(text="")
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            use_case.execute(request)
+            await use_case.execute(request)
 
         assert exc_info.value.message == "Readable study text is required"
 
-    def test_stops_flow_without_generating_when_text_is_whitespace_only(
+    async def test_stops_flow_without_generating_when_text_is_whitespace_only(
         self,
     ) -> None:
         # Arrange
-        use_case = GenerateFlashcardsUseCase()
+        use_case = GenerateFlashcardsUseCase(generator=FakeGenerator())
         request = GenerateFlashcardsRequest(text="   \t\n  ")
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            use_case.execute(request)
+            await use_case.execute(request)
 
         assert exc_info.value.message == "Readable study text is required"
 
-    def test_proceeds_to_generation_when_text_contains_non_whitespace_character(
-        self,
-    ) -> None:
+    async def test_returns_generated_cards_when_generation_succeeds(self) -> None:
         # Arrange
-        use_case = GenerateFlashcardsUseCase()
+        generator = FakeGenerator(
+            cards=[
+                Flashcard(front="Q1", back="A1"),
+                Flashcard(front="Q2", back="A2"),
+            ]
+        )
+        use_case = GenerateFlashcardsUseCase(generator=generator)
         request = GenerateFlashcardsRequest(text="Review chapter 3")
 
         # Act
-        study_text = use_case.execute(request)
+        cards = await use_case.execute(request)
 
         # Assert
-        assert study_text.value == "Review chapter 3"
+        assert cards == (
+            Flashcard(front="Q1", back="A1"),
+            Flashcard(front="Q2", back="A2"),
+        )
+        assert generator.called_with is not None
+        assert generator.called_with.value == "Review chapter 3"
+
+    async def test_returns_single_card_when_generator_produces_one_card(self) -> None:
+        # Arrange
+        generator = FakeGenerator(cards=[Flashcard(front="Q", back="A")])
+        use_case = GenerateFlashcardsUseCase(generator=generator)
+        request = GenerateFlashcardsRequest(text="Study text")
+
+        # Act
+        cards = await use_case.execute(request)
+
+        # Assert
+        assert cards == (Flashcard(front="Q", back="A"),)
+
+    async def test_raises_generation_error_when_generator_returns_zero_cards(self) -> None:
+        # Arrange
+        generator = FakeGenerator(cards=[])
+        use_case = GenerateFlashcardsUseCase(generator=generator)
+        request = GenerateFlashcardsRequest(text="Review chapter 3")
+
+        # Act & Assert
+        with pytest.raises(GenerationError):
+            await use_case.execute(request)
+
+    async def test_propagates_invalid_generator_output_error(self) -> None:
+        # Arrange
+        generator = FakeGenerator(
+            cards=[],
+            exc=InvalidGeneratorOutputError("Malformed generator output"),
+        )
+        use_case = GenerateFlashcardsUseCase(generator=generator)
+        request = GenerateFlashcardsRequest(text="Review chapter 3")
+
+        # Act & Assert
+        with pytest.raises(InvalidGeneratorOutputError):
+            await use_case.execute(request)
+
+    async def test_propagates_provider_limit_exceeded_error(self) -> None:
+        # Arrange
+        generator = FakeGenerator(
+            cards=[],
+            exc=ProviderLimitExceededError("Input exceeds provider limit"),
+        )
+        use_case = GenerateFlashcardsUseCase(generator=generator)
+        request = GenerateFlashcardsRequest(text="Review chapter 3")
+
+        # Act & Assert
+        with pytest.raises(ProviderLimitExceededError):
+            await use_case.execute(request)
+
+    async def test_factory_provides_use_case_instance(self) -> None:
+        # Arrange & Act
+        use_case = get_flashcards_use_case()
+
+        # Assert
+        assert isinstance(use_case, GenerateFlashcardsUseCase)

@@ -5,6 +5,7 @@ description = "Autokards MVP backend - flashcard generation with input validatio
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0,<1.0",
+    "httpx>=0.28.0,<1.0",
     "pydantic>=2.10.0,<3.0",
     "uvicorn[standard]>=0.32.0,<1.0",
 ]
@@ -14,7 +15,6 @@ dev = [
     "pytest>=8.3.0,<9.0",
     "pytest-asyncio>=0.25.0,<1.0",
     "pytest-cov>=6.0.0,<7.0",
-    "httpx>=0.28.0,<1.0",
     "ruff>=0.11.0,<1.0",
     "mypy>=1.13.0,<2.0",
 ]
