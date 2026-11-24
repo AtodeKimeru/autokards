@@ -17,7 +17,7 @@ from src.domain.ports.flashcard_generator import FlashcardGenerator
 class GenerateFlashcardsUseCase:
     """Orchestrates input validation before flashcard generation."""
 
-    def __init__(self, generator: FlashcardGenerator | None = None) -> None:
+    def __init__(self, generator: FlashcardGenerator) -> None:
         self._generator = generator
 
     async def execute(self, request: GenerateFlashcardsRequest) -> tuple[Flashcard, ...]:
@@ -26,31 +26,18 @@ class GenerateFlashcardsUseCase:
         Raises :class:`ValidationError` when the text is empty or
         whitespace-only, stopping the flow before any generation work.
         Raises :class:`GenerationError` when the generator returns zero cards,
-        returns invalid output, or fails.
+        returns invalid output, fails, or raises an unexpected exception.
         """
         study_text = StudyText(value=request.text)
         return await self._generate(study_text)
 
     async def _generate(self, study_text: StudyText) -> tuple[Flashcard, ...]:
-        generator = self._generator or self._resolve_default_generator()
-        cards = await generator.generate(study_text)
+        try:
+            cards = await self._generator.generate(study_text)
+        except GenerationError:
+            raise
+        except Exception as exc:
+            raise GenerationError("Generation failed unexpectedly") from exc
         if not cards:
             raise GenerationError("No flashcards were generated from the input")
         return FlashcardSet(cards=cards).cards
-
-    def _resolve_default_generator(self) -> FlashcardGenerator:
-        """Resolve the generator configured for the current environment."""
-        raise NotImplementedError(
-            "Default generator resolution is handled in main.py wiring; "
-            "inject a generator for tests or configure LLM_PROVIDER in production."
-        )
-
-
-def get_flashcards_use_case() -> GenerateFlashcardsUseCase:
-    """Dependency factory providing a ``GenerateFlashcardsUseCase`` instance.
-
-    Production wiring is done in ``main.py`` which resolves ``LLM_PROVIDER``
-    before constructing the use case. Tests construct
-    ``GenerateFlashcardsUseCase(generator=...)`` directly with a fake.
-    """
-    return GenerateFlashcardsUseCase()

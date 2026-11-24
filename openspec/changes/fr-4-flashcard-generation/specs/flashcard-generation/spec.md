@@ -3,10 +3,25 @@
 ## Purpose
 
 Generates one or more front/back flashcards from validated study text, enforcing
-single-target Fronts, answering and grounded Backs, strict output validation, and
-explicit generation-failure behavior.
+single-target Fronts, answering and grounded Backs, strict output validation, a
+byte ceiling on submitted text, a typed success contract, and explicit
+generation-failure behavior.
 
 ## ADDED Requirements
+
+### Requirement: Enforce a byte ceiling on submitted text
+The system SHALL reject study text whose UTF-8 encoded length exceeds the configured `MAX_INPUT_BYTES` ceiling before any provider request is made.
+
+#### Scenario: Oversized input is rejected
+- **WHEN** the user submits text whose UTF-8 byte length exceeds `MAX_INPUT_BYTES`
+- **THEN** the system returns HTTP 413 with code `INPUT_TOO_LARGE`
+- **AND** the error details report `limit_bytes` and `received_bytes`
+- **AND** no provider request is made and no cards are returned
+- **AND** the submitted text is not truncated
+
+#### Scenario: Text at the ceiling is accepted
+- **WHEN** the user submits text whose UTF-8 byte length is exactly `MAX_INPUT_BYTES`
+- **THEN** the system processes it normally
 
 ### Requirement: Generate one or more flashcards
 The system SHALL generate one or more flashcards from study text that passed input validation.
@@ -62,13 +77,35 @@ The system SHALL return generated cards in the success response of the generatio
 - **AND** the response contains the generated cards in `data.cards`
 - **AND** no `.apkg` file or download link is included
 
+### Requirement: Documented success schema
+The system SHALL expose the success response schema in OpenAPI, describing `data.cards` as an array of objects with non-empty string `front` and `back`.
+
+#### Scenario: OpenAPI describes the card schema
+- **WHEN** the OpenAPI document is generated for the generation endpoint
+- **THEN** the 200 response references a schema with typed `data.cards[].front` and `data.cards[].back`
+- **AND** it is not an untyped `additionalProperties` object
+
+### Requirement: Consistent error envelope
+The system SHALL return every error response using the standard envelope `{success: false, error: {message, code, details}}`, including request-schema validation failures.
+
+#### Scenario: Missing or unknown request field
+- **WHEN** the request body omits `text` or includes an unknown field
+- **THEN** the system returns HTTP 422 with code `INVALID_REQUEST`
+- **AND** the response uses the standard envelope
+- **AND** the response does not echo the submitted input back
+
+#### Scenario: No internals exposed
+- **WHEN** any error response is returned
+- **THEN** it contains no stack trace, provider credential, or upstream URL
+
 ### Requirement: Explicit generation failures
 The system SHALL report generation failures explicitly and SHALL NOT return partial cards or silently truncate input.
 
 #### Scenario: Provider cannot process the input
-- **WHEN** the generation provider rejects the complete input as exceeding its own limit
+- **WHEN** the generation provider rejects the complete input as exceeding its own context limit, signalled either by HTTP 422 or by an HTTP 400 carrying a context-length-overflow error
 - **THEN** the system returns HTTP 422 with code `INPUT_EXCEEDS_PROVIDER_LIMIT`
 - **AND** no cards are returned
+- **AND** the input is not truncated
 
 #### Scenario: Provider fails
 - **WHEN** the generation provider times out, fails, or returns malformed output

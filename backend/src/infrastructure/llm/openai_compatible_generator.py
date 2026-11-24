@@ -7,8 +7,11 @@ variables: ``LLM_BASE_URL``, ``LLM_API_KEY``, ``LLM_MODEL``,
 
 Strict output parsing requires a JSON array of ``{front, back}`` objects;
 malformed JSON, zero cards, empty fields, or non-string values raise
-:class:`InvalidGeneratorOutputError`. Provider limit responses (HTTP 422)
-raise :class:`ProviderLimitExceededError`; all other failures raise
+:class:`InvalidGeneratorOutputError`. Provider context-limit responses raise
+:class:`ProviderLimitExceededError`: HTTP 422, or HTTP 400 whose error
+payload signals a context-length overflow (OpenAI, OpenRouter, Ollama, and
+LM Studio all report overflow as HTTP 400, so a literal-422-only check would
+make this scenario unreachable). All other failures raise
 :class:`GenerationError`.
 """
 
@@ -26,6 +29,15 @@ from src.domain.exceptions import (
 from src.domain.models.flashcard import Flashcard
 from src.domain.models.study_text import StudyText
 from src.domain.ports.flashcard_generator import FlashcardGenerator
+
+_DEFAULT_MAX_TOKENS = 2000
+
+_CONTEXT_OVERFLOW_SIGNALS = (
+    "context_length_exceeded",
+    "context length",
+    "maximum context length",
+    "context_length",
+)
 
 _SYSTEM_PROMPT = """You are a flashcard generator. Given study text, produce flashcards
 for spaced repetition. Return ONLY a JSON array of objects, each with exactly
@@ -87,6 +99,7 @@ class OpenAICompatibleGenerator(FlashcardGenerator):
                 {"role": "user", "content": study_text.value},
             ],
             "temperature": 0.3,
+            "max_tokens": _DEFAULT_MAX_TOKENS,
         }
 
         try:
@@ -101,13 +114,36 @@ class OpenAICompatibleGenerator(FlashcardGenerator):
         except httpx.RequestError as exc:
             raise GenerationError(f"Generation request failed: {exc}") from exc
 
-        if response.status_code == 422:
+        if response.status_code == 422 or self._is_context_overflow(response):
             raise ProviderLimitExceededError("Input exceeds provider limit")
 
         if response.status_code >= 400:
             raise GenerationError(f"Provider returned HTTP {response.status_code}")
 
         return self._parse_output(response)
+
+    def _is_context_overflow(self, response: httpx.Response) -> bool:
+        """Detect a context-length overflow reported as HTTP 400.
+
+        OpenAI, OpenRouter, Ollama, and LM Studio surface this condition as
+        HTTP 400 with an error payload naming the overflow, rather than 422.
+        """
+        if response.status_code != 400:
+            return False
+        try:
+            body = response.json()
+        except (ValueError, json.JSONDecodeError):
+            return False
+        if not isinstance(body, dict):
+            return False
+        error = body.get("error")
+        error_text = ""
+        if isinstance(error, dict):
+            error_text = f"{error.get('code', '')} {error.get('message', '')}"
+        elif isinstance(error, str):
+            error_text = error
+        error_text = error_text.lower()
+        return any(signal in error_text for signal in _CONTEXT_OVERFLOW_SIGNALS)
 
     def _parse_output(self, response: httpx.Response) -> tuple[Flashcard, ...]:
         """Parse and strictly validate the provider's JSON output."""

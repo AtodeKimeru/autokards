@@ -5,7 +5,6 @@ import pytest
 from src.application.schemas.generate_flashcards import GenerateFlashcardsRequest
 from src.application.services.generate_flashcards_use_case import (
     GenerateFlashcardsUseCase,
-    get_flashcards_use_case,
 )
 from src.domain.exceptions import (
     GenerationError,
@@ -131,9 +130,19 @@ class TestGenerateFlashcardsUseCase:
         with pytest.raises(ProviderLimitExceededError):
             await use_case.execute(request)
 
-    async def test_factory_provides_use_case_instance(self) -> None:
-        # Arrange & Act
-        use_case = get_flashcards_use_case()
+    async def test_wraps_unexpected_generator_exception_as_generation_error(self) -> None:
+        # Arrange
+        generator = FakeGenerator(cards=[], exc=RuntimeError("boom"))
+        use_case = GenerateFlashcardsUseCase(generator=generator)
+        request = GenerateFlashcardsRequest(text="Review chapter 3")
 
-        # Assert
-        assert isinstance(use_case, GenerateFlashcardsUseCase)
+        # Act & Assert
+        with pytest.raises(GenerationError) as exc_info:
+            await use_case.execute(request)
+
+        assert exc_info.value.message == "Generation failed unexpectedly"
+
+    def test_requires_a_generator_at_construction(self) -> None:
+        # Arrange & Act & Assert
+        with pytest.raises(TypeError):
+            GenerateFlashcardsUseCase()  # type: ignore[call-arg]

@@ -12,6 +12,24 @@ class ValidationError(Exception):
         self.message = message
 
 
+class InputTooLargeError(ValidationError):
+    """Raised when input exceeds the configured byte limit.
+
+    Carries the limit and received bytes for detailed error reporting.
+    """
+
+    def __init__(
+        self,
+        limit_bytes: int,
+        received_bytes: int,
+        message: str = "Input exceeds byte limit",
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.limit_bytes = limit_bytes
+        self.received_bytes = received_bytes
+
+
 class GenerationError(Exception):
     """Raised when flashcard generation fails for any reason.
 

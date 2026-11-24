@@ -4,32 +4,39 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from src.application.schemas.flashcard_response import (
+    GenerateFlashcardsSuccessResponse,
+)
 from src.application.schemas.generate_flashcards import GenerateFlashcardsRequest
 from src.application.services.generate_flashcards_use_case import (
     GenerateFlashcardsUseCase,
-    get_flashcards_use_case,
 )
+from src.domain.models.flashcard import Flashcard
+from src.infrastructure.composition import get_flashcards_use_case
 
 router = APIRouter(prefix="/api/v1/flashcards", tags=["flashcards"])
 
 
-@router.post("/generate", status_code=200)
+@router.post(
+    "/generate",
+    status_code=200,
+    response_model=GenerateFlashcardsSuccessResponse,
+)
 async def generate_flashcards(
     request: GenerateFlashcardsRequest,
     use_case: Annotated[GenerateFlashcardsUseCase, Depends(get_flashcards_use_case)],
-) -> dict[str, object]:
+) -> GenerateFlashcardsSuccessResponse:
     """Generate flashcards from submitted study text.
 
     Invalid (empty or whitespace-only) input raises ``ValidationError``
     which the global exception handler maps to HTTP 400. Generation
     failures map to HTTP 422 (provider limit) or HTTP 502 (provider
-    error). No ``.apkg`` download is produced or offered.
+    error). Input exceeding ``MAX_INPUT_BYTES`` raises ``InputTooLargeError``
+    which maps to HTTP 413.
     """
-    cards = await use_case.execute(request)
-    return {
-        "success": True,
-        "data": {
-            "cards": [{"front": card.front, "back": card.back} for card in cards],
-        },
-        "message": "Flashcards generated",
-    }
+    cards: tuple[Flashcard, ...] = await use_case.execute(request)
+    return GenerateFlashcardsSuccessResponse(
+        success=True,
+        data={"cards": [{"front": card.front, "back": card.back} for card in cards]},
+        message="Flashcards generated",
+    )
