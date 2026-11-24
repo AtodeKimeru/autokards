@@ -110,7 +110,7 @@ so the existing step reports stay aligned with their sections.
 - [x] 11.2 Generate cards with the stub and, if credentials exist, with the real provider
 - [x] 11.3 Review every card: non-empty Front/Back (SM-05), single retrieval target (SM-06), Back answers and is grounded (SM-07)
 - [x] 11.4 Record pass/fail per card in `openspec/changes/fr-4-flashcard-generation/reports/2026-11-24-sm-05-06-07-quality-validation.md`; verify the report exists
-- [ ] 11.5 Re-run SM-05/06/07 against a configured real provider and record pass/fail per card; verify the report no longer reports SM-07 as SEMANTIC PENDING before AUTK-8 is closed
+- [x] 11.5 Re-run SM-05/06/07 against a configured real provider and record pass/fail per card; verify the report no longer reports SM-07 as SEMANTIC PENDING before AUTK-8 is closed
 
 ## 12. Update Technical Documentation (MANDATORY)
 
@@ -128,18 +128,20 @@ so the existing step reports stay aligned with their sections.
 - [x] 13.3 Run `pytest --cov=src` and verify >=90% coverage
 - [x] 13.4 Commit with conventional messages (`feat(AUTK-8): ...`, `refactor(AUTK-8): ...`, `docs(AUTK-8): ...`); verify commit is clean
 - [x] 13.5 Push `feature/AUTK-8` and open a PR to `main` referencing AUTK-8; verify PR exists
-- [ ] 13.6 Move AUTK-8 to **In Review** and comment the PR link; verify ticket status
-- [ ] 13.7 File follow-up AUTK tickets for the deferred items listed under Workflow follow-up and link them from this file; verify each ticket exists
+- [x] 13.6 Comment PR #5 link on AUTK-8 (ticket already in "En revisión" status); verify ticket status
+- [x] 13.7 File follow-up AUTK tickets for the deferred items listed under Workflow follow-up and link them from this file; verify each ticket exists
 
 ## Workflow follow-up
 
+- [x] 13.6 Comment added to AUTK-8 with PR #5 link (https://github.com/AtodeKimeru/autokards/pull/5)
+- [x] 13.7 File follow-up AUTK tickets for the deferred items listed below; update this section with ticket keys
 - Archive `fr-4-flashcard-generation` after PR review and merge.
 - Raise the `reconcile-text-input` change separately if the AUTK-6 duplicate cleanup is still wanted; it was never created and is not a dependency of this change.
 - Deferred follow-ups to file as AUTK tickets:
-  - Adapter retry and code-fence repair (JSON wrapped in code fences currently returns 502).
-  - Provider 401/403/429 distinction with `Retry-After` and retry/backoff.
-  - Output size caps: card count, Front/Back length, and deduplication.
-  - Structured logging for provider failures.
-  - `FlashcardSet` accepts lists and is unhashable despite `frozen=True`.
-  - Config parse errors should name the offending variable; add bounds checks for timeouts.
-  - Reuse a long-lived `httpx.AsyncClient` instead of creating one per request.
+  - AUTK-9: Adapter retry and code-fence repair (JSON wrapped in code fences currently returns 502)
+  - AUTK-10: Provider 401/403/429 distinction with `Retry-After` and retry/backoff
+  - AUTK-11: Output size caps: card count, Front/Back length, and deduplication
+  - AUTK-12: Structured logging for provider failures
+  - AUTK-13: `FlashcardSet` accepts lists and is unhashable despite `frozen=True`
+  - AUTK-14: Config parse errors should name the offending variable; add bounds checks for timeouts
+  - AUTK-15: Reuse a long-lived `httpx.AsyncClient` instead of creating one per request
