@@ -1,0 +1,46 @@
+[project]
+name = "autokards-backend"
+version = "0.1.0"
+description = "Autokards MVP backend - flashcard generation with input validation"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0,<1.0",
+    "pydantic>=2.10.0,<3.0",
+    "uvicorn[standard]>=0.32.0,<1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0,<9.0",
+    "pytest-asyncio>=0.25.0,<1.0",
+    "pytest-cov>=6.0.0,<7.0",
+    "httpx>=0.28.0,<1.0",
+    "ruff>=0.11.0,<1.0",
+    "mypy>=1.13.0,<2.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+disallow_untyped_defs = true
+warn_return_any = true
+disallow_any_generics = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "--strict-markers",
+]
