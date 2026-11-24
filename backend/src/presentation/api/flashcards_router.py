@@ -5,6 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from src.application.schemas.flashcard_response import (
+    FlashcardDataResponse,
+    FlashcardResponse,
     GenerateFlashcardsSuccessResponse,
 )
 from src.application.schemas.generate_flashcards import GenerateFlashcardsRequest
@@ -35,8 +37,11 @@ async def generate_flashcards(
     which maps to HTTP 413.
     """
     cards: tuple[Flashcard, ...] = await use_case.execute(request)
+    flashcard_data = FlashcardDataResponse(
+        cards=[FlashcardResponse(front=card.front, back=card.back) for card in cards]
+    )
     return GenerateFlashcardsSuccessResponse(
         success=True,
-        data={"cards": [{"front": card.front, "back": card.back} for card in cards]},
+        data=flashcard_data,
         message="Flashcards generated",
     )

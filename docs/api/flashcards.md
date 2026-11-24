@@ -42,14 +42,50 @@ Accepts validated study text and returns generated flashcards.
 { "success": false, "error": { "message": "Readable study text is required", "code": "VALIDATION_ERROR", "details": [] } }
 ```
 
+#### `413 Request Entity Too Large` — text exceeds byte limit
+
+```json
+{ 
+    "success": false, 
+    "error": { 
+        "message": "Input exceeds byte limit", 
+        "code": "INPUT_TOO_LARGE", 
+        "details": [{"limit_bytes": 10485760, "received_bytes": 11534336}] 
+    } 
+}
+```
+
+#### `422 Unprocessable Content` — invalid request structure
+
+```json
+{ "success": false, "error": { "message": "Request validation failed", "code": "INVALID_REQUEST", "details": [] } }
+```
+
 #### `422 Unprocessable Content` — provider cannot process the input
 
 ```json
 { "success": false, "error": { "message": "Input exceeds provider limit", "code": "INPUT_EXCEEDS_PROVIDER_LIMIT", "details": [] } }
 ```
 
-Originates from the generation provider's own limit (not an editorial rule).
-No cards are returned; input is never silently truncated.
+Originates from the generation provider's own context limit when input (or the
+request's token parameters) exceeds what the LLM can handle. The provider
+endpoint is called with `max_tokens` set to estimate token safety; if the
+provider rejects with HTTP 422 or HTTP 400 with a context-length-overflow
+error, this error is returned. No cards are returned; input is never silently
+truncated.
+
+#### Context-limit detection
+
+The system detects when the provider's context limit is exceeded by inspecting
+the provider's HTTP response. If the provider returns:
+- HTTP 422, or
+- HTTP 400 with a `context_length_overflow` error in the response body
+
+the system maps this to `INPUT_EXCEEDS_PROVIDER_LIMIT`. The `max_tokens`
+parameter is included in the request payload to help the provider validate
+token counts before processing.
+
+#### `502 Bad Gateway` — provider failure or invalid output
 
 #### `502 Bad Gateway` — provider failure or invalid output
 
@@ -76,12 +112,24 @@ Error codes: `VALIDATION_ERROR` (400), `INPUT_EXCEEDS_PROVIDER_LIMIT` (422),
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `APP_ENV` | Application environment: `production` forbids `LLM_PROVIDER=stub` | `development` |
 | `LLM_PROVIDER` | Provider selector: `stub` for offline/tests, otherwise OpenAI-compatible | `stub` |
 | `LLM_BASE_URL` | Base URL of the OpenAI-compatible chat-completions endpoint | `http://localhost:11434/v1` |
 | `LLM_API_KEY` | API key for the provider (empty when not required) | `""` |
 | `LLM_MODEL` | Model name used for generation | `gpt-4o-mini` |
 | `LLM_TIMEOUT_SECONDS` | Request timeout in seconds | `30` |
-| `MAX_INPUT_BYTES` | Infrastructure byte ceiling for submitted text | `2000` |
+| `MAX_INPUT_BYTES` | Infrastructure byte ceiling for submitted text (UTF-8 bytes) | `10485760` (10 MiB) |
+
+### APP_ENV production guard
+
+When `APP_ENV=production` is set, the application will refuse to start if
+`LLM_PROVIDER=stub`. The stub returns deterministic but fabricated cards that
+are not grounded in the input text; serving such output in production would
+mislead users. The application raises a `ConfigurationError` at startup with a
+clear message to configure a real provider or unset `APP_ENV`.
+
+Outside production, a warning is logged when the stub is active, indicating
+that generated flashcards are fabricated and not grounded in the input.
 
 ### Backend startup
 

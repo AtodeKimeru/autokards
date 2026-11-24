@@ -28,12 +28,13 @@ LLM_PROVIDER=openai \
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `APP_ENV` | Application environment: `production` forbids `LLM_PROVIDER=stub` | `development` |
 | `LLM_PROVIDER` | Provider selector: `stub` or any OpenAI-compatible provider | `stub` |
 | `LLM_BASE_URL` | Base URL of the OpenAI-compatible chat-completions endpoint | `http://localhost:11434/v1` |
 | `LLM_API_KEY` | API key for the provider | `""` |
 | `LLM_MODEL` | Model name used for generation | `gpt-4o-mini` |
 | `LLM_TIMEOUT_SECONDS` | Request timeout in seconds | `30` |
-| `MAX_INPUT_BYTES` | Infrastructure byte ceiling for submitted text | `2000` |
+| `MAX_INPUT_BYTES` | Infrastructure byte ceiling for submitted text | `10485760` (10 MiB)
 
 ### API contract
 

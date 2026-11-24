@@ -119,7 +119,9 @@ def test_returns_502_when_provider_fails() -> None:
         body = response.json()
         assert body["success"] is False
         assert body["error"]["code"] == "GENERATION_ERROR"
-        assert "stack" not in response.text.lower()
+        # Ensure no Python traceback is exposed in response
+        assert "Traceback" not in response.text
+        assert "File " not in response.text
         assert ".apkg" not in response.text
     finally:
         del app.dependency_overrides[get_flashcards_use_case]

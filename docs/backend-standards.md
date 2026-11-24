@@ -77,6 +77,7 @@ This document outlines the best practices, conventions, and standards for the Py
 - **Python**: Python 3.11+ with full type annotations
 - **Web Framework**: FastAPI (or your chosen async/sync HTTP framework)
 - **Validation & Serialization**: Pydantic v2
+- **HTTP Client**: `httpx` for async HTTP requests (e.g., calling external LLM APIs)
 
 ### Database & ORM
 - **Database**: PostgreSQL (or SQLite for local/embedded workflows)
@@ -134,6 +135,7 @@ backend/
 ├── src/
 │   ├── domain/
 │   │   ├── models/          # Domain entities, value objects, aggregates
+│   │   ├── ports/           # Port/interface definitions for external services
 │   │   ├── repositories/    # Repository protocols/interfaces
 │   │   └── services/        # Pure domain services
 │   ├── application/

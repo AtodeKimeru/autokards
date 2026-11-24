@@ -13,19 +13,19 @@ No database exists in this change (stateless slice). Documented as N/A.
 - `tests/unit/application/test_generate_flashcards_use_case.py` — 8 passed
 - `tests/unit/infrastructure/llm/test_stub_generator.py` — 4 passed
 - `tests/unit/infrastructure/llm/test_openai_compatible_generator.py` — 7 passed
-- `tests/integration/api/test_flashcards_generate.py` — 5 passed
+- `tests/integration/api/test_flashcards_generate.py` — 9 passed
 
 ## 8.3 Full suite
 
-`pytest --cov=src` — 41 passed, 0 failures.
+`pytest --cov=src` — 55 passed, 0 failures, 209 warnings in 1.90s.
 
 ## 8.4 Coverage
 
-Total: 218 statements, 13 missed, 94% coverage (>= 90% target met).
+Total: 306 statements, 18 missed, 94% coverage (>= 90% target met).
 
 Per-file coverage is 100% for all domain and presentation modules; minor gaps
-only in exception/error-handling branches of `generate_flashcards_use_case.py`
-(95%), `openai_compatible_generator.py` (85%), and `stub_generator.py` (92%).
+only in exception/error-handling branches of `openai_compatible_generator.py`
+(83%), `stub_generator.py` (92%), and `composition.py` (92%).
 
 ## 8.5 Post-test state
 

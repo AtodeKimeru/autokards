@@ -51,14 +51,14 @@
 - [x] 5.3 Update `backend/src/presentation/api/exceptions.py` to map generation errors to `422/502` with the standard envelope; verify error mapping tests pass
 - [x] 5.4 Update `backend/src/main.py` to wire the generator according to `LLM_PROVIDER`; verify app starts with stub provider
 - [x] 5.5 Run `ruff check .`, `ruff format --check`, and `mypy src`; verify no lint or type errors
-- [ ] 5.6 Add failing integration tests for the byte ceiling: text above `MAX_INPUT_BYTES` returns 413 `INPUT_TOO_LARGE` with `limit_bytes`/`received_bytes`, text at the ceiling returns 200, and no provider call occurs on rejection; verify they fail before implementation
-- [ ] 5.7 Enforce the ceiling with a UTF-8 byte-length validator plus a `Content-Length` pre-check, and map `InputTooLargeError` to 413 in the error envelope; verify 5.6 passes
-- [ ] 5.8 Add a failing test asserting the OpenAPI 200 response references a typed `data.cards[].front`/`data.cards[].back` schema rather than an untyped object; verify it fails before implementation
-- [ ] 5.9 Add Pydantic response models for the success payload and use them as the route `response_model`; verify 5.8 passes
-- [ ] 5.10 Add failing tests asserting that a missing or unknown request field returns 422 `INVALID_REQUEST` in the standard envelope without echoing the submitted input; verify they fail before implementation
-- [ ] 5.11 Register a `RequestValidationError` handler that emits the standard envelope and strips submitted input from the response; verify 5.10 passes
-- [ ] 5.12 Move generator wiring out of `app.dependency_overrides` into a provider function consumed by `Depends`, and update the integration tests to remove only their own override; verify the full integration suite passes regardless of test order
-- [ ] 5.13 Run `ruff check .`, `ruff format --check`, and `mypy src`; verify no lint or type errors
+- [x] 5.6 Add failing integration tests for the byte ceiling: text above `MAX_INPUT_BYTES` returns 413 `INPUT_TOO_LARGE` with `limit_bytes`/`received_bytes`, text at the ceiling returns 200, and no provider call occurs on rejection; verify they fail before implementation
+- [x] 5.7 Enforce the ceiling with a UTF-8 byte-length validator plus a `Content-Length` pre-check, and map `InputTooLargeError` to 413 in the error envelope; verify 5.6 passes
+- [x] 5.8 Add a failing test asserting the OpenAPI 200 response references a typed `data.cards[].front`/`data.cards[].back` schema rather than an untyped object; verify it fails before implementation
+- [x] 5.9 Add Pydantic response models for the success payload and use them as the route `response_model`; verify 5.8 passes
+- [x] 5.10 Add failing tests asserting that a missing or unknown request field returns 422 `INVALID_REQUEST` in the standard envelope without echoing the submitted input; verify they fail before implementation
+- [x] 5.11 Register a `RequestValidationError` handler that emits the standard envelope and strips submitted input from the response; verify 5.10 passes
+- [x] 5.12 Move generator wiring out of `app.dependency_overrides` into a provider function consumed by `Depends`, and update the integration tests to remove only their own override; verify the full integration suite passes regardless of test order
+- [x] 5.13 Run `ruff check .`, `ruff format --check`, and `mypy src`; verify no lint or type errors
 
 ## 6. Companion change (NOT part of this change)
 
@@ -73,9 +73,9 @@ so the existing step reports stay aligned with their sections.
 
 - [x] 7.1 Review existing unit tests for the touched modules and update expectations (notably the FR-3 integration test that expects `202`)
 - [x] 7.2 Add any missing edge cases discovered during implementation
-- [ ] 7.3 Add `backend/tests/conftest.py` with a fixture that pins environment configuration (`LLM_PROVIDER=stub`) per test; verify `LLM_PROVIDER=openai pytest` produces the same result as an unmodified shell
-- [ ] 7.4 Rewrite assertions that prove nothing: the stub-guard test that raises inside `StudyText`, the `front != back` tautology, the `"stack" not in body` check, and the adapter mocks that discard `url`/`kwargs` (assert the `Authorization` header, `model`, and the `/chat/completions` path); verify each rewritten test fails when the behavior it covers is deliberately broken
-- [ ] 7.5 Replace `app.dependency_overrides.clear()` with a targeted `del` in a `try/finally` fixture; verify the integration module passes with tests run in reverse order
+- [x] 7.3 Add `backend/tests/conftest.py` with a fixture that pins environment configuration (`LLM_PROVIDER=stub`) per test; verify `LLM_PROVIDER=openai pytest` produces the same result as an unmodified shell
+- [x] 7.4 Rewrite assertions that prove nothing: the stub-guard test that raises inside `StudyText`, the `front != back` tautology, the `"stack" not in body` check, and the adapter mocks that discard `url`/`kwargs` (assert the `Authorization` header, `model`, and the `/chat/completions` path); verify each rewritten test fails when the behavior it covers is deliberately broken
+- [x] 7.5 Replace `app.dependency_overrides.clear()` with a targeted `del` in a `try/finally` fixture; verify the integration module passes with tests run in reverse order
 
 ## 8. Run Unit Tests and Verify Database State (MANDATORY)
 
@@ -84,7 +84,7 @@ so the existing step reports stay aligned with their sections.
 - [x] 8.3 Run the full suite: `pytest --cov=src`
 - [x] 8.4 Verify post-test state (no DB; document N/A) and restore anything mutated
 - [x] 8.5 Create `openspec/changes/fr-4-flashcard-generation/reports/2026-11-24-step-8-unit-test-and-db-verification.md`; verify the report exists
-- [ ] 8.6 Re-run the full suite after the revisions in sections 3-5 and 7 and update the step-8 report with the new counts and coverage; verify the report matches the command output
+- [x] 8.6 Re-run the full suite after the revisions in sections 3-5 and 7 and update the step-8 report with the new counts and coverage; verify the report matches the command output
 
 ## 9. Manual Endpoint Testing with curl (MANDATORY - AGENT MUST EXECUTE)
 
@@ -92,13 +92,13 @@ so the existing step reports stay aligned with their sections.
 - [x] 9.2 Test valid text -> 200 + `data.cards`
 - [x] 9.3 Test empty text -> 400
 - [x] 9.4 Test whitespace-only text -> 400
-- [ ] 9.5 Test oversized input -> 413 `INPUT_TOO_LARGE` with `limit_bytes`/`received_bytes`
-- [ ] 9.6 Test a missing or unknown request field -> 422 `INVALID_REQUEST` in the standard envelope
-- [ ] 9.7 Test provider limit -> 422 `INPUT_EXCEEDS_PROVIDER_LIMIT` using real curl against the app pointed at a local stub HTTP provider that returns 422 (not TestClient)
-- [ ] 9.8 Test provider failure -> 502 `GENERATION_ERROR` with the same local stub provider returning 500
-- [ ] 9.9 Verify no `.apkg` or download link is present in any response
-- [ ] 9.10 Rewrite `openspec/changes/fr-4-flashcard-generation/reports/2026-11-24-step-9-curl-verification.md` with the actual curl commands and responses, explicitly noting which cases previously used TestClient instead of curl
-- [ ] 9.11 Stop the server and confirm no state was left behind
+- [x] 9.5 Test oversized input -> 413 `INPUT_TOO_LARGE` with `limit_bytes`/`received_bytes`
+- [x] 9.6 Test a missing or unknown request field -> 422 `INVALID_REQUEST` in the standard envelope
+- [x] 9.7 Test provider limit -> 422 `INPUT_EXCEEDS_PROVIDER_LIMIT` using real curl against the app pointed at a local stub HTTP provider that returns 422 (not TestClient)
+- [x] 9.8 Test provider failure -> 502 `GENERATION_ERROR` with the same local stub provider returning 500
+- [x] 9.9 Verify no `.apkg` or download link is present in any response
+- [x] 9.10 Rewrite `openspec/changes/fr-4-flashcard-generation/reports/2026-11-24-step-9-curl-verification.md` with the actual curl commands and responses, explicitly noting which cases previously used TestClient instead of curl
+- [x] 9.11 Stop the server and confirm no state was left behind
 
 ## 10. E2E Testing with Playwright MCP (N/A - no frontend)
 
@@ -116,10 +116,10 @@ so the existing step reports stay aligned with their sections.
 
 - [x] 12.1 Add `docs/api/flashcards.md` with the request/response contract, error codes, and env vars; verify it renders
 - [x] 12.2 Update `README.md` with backend startup and LLM env configuration; verify it renders
-- [ ] 12.3 Update `docs/backend-standards.md` to list `httpx` in the stack and the `domain/ports/` package; verify it renders and matches the implemented structure
-- [ ] 12.4 Update `docs/api/flashcards.md` to document 413, 422 `INVALID_REQUEST`, context-limit detection, the `APP_ENV` production guard, and the 10 MiB default; verify each example matches a real curl response
-- [ ] 12.5 Update the README environment table for `APP_ENV` and the new `MAX_INPUT_BYTES` default; verify it matches `backend/src/config.py`
-- [ ] 12.6 Sync the `flashcard-generation` spec delta into `openspec/specs/` and verify `openspec validate` passes
+- [x] 12.3 Update `docs/backend-standards.md` to list `httpx` in the stack and the `domain/ports/` package; verify it renders and matches the implemented structure
+- [x] 12.4 Update `docs/api/flashcards.md` to document 413, 422 `INVALID_REQUEST`, context-limit detection, the `APP_ENV` production guard, and the 10 MiB default; verify each example matches a real curl response
+- [x] 12.5 Update the README environment table for `APP_ENV` and the new `MAX_INPUT_BYTES` default; verify it matches `backend/src/config.py`
+- [x] 12.6 Sync the `flashcard-generation` spec delta into `openspec/specs/` and verify `openspec validate` passes
 
 ## 13. Final verification and delivery
 
