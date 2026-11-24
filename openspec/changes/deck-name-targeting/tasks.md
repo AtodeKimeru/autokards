@@ -36,11 +36,11 @@
 ## 6. Update Technical Documentation (MANDATORY)
 
 - [x] 6.1 Verify PRD edits are consistent between autokards-mvp.md and scope-mvp.md
-- [x] 6.2 Verify no remaining numeric Deck ID references conflict with deck-name targeting
+- [x] 6.2 Verify no remaining numeric Deck ID references conflict with deck-name targeting in `docs/prd/` (backend-standards.md numeric Deck ID examples are out of scope for this docs-only change; tracked as a follow-up card)
 
 ## Workflow follow-up
 
-- Run `openspec validate --change deck-name-targeting` to confirm artifact coherence
+- Run `openspec validate --changes deck-name-targeting --strict` to confirm artifact coherence
 - Present the PRD diff to the user for review
 - Archive the change once review requirements are satisfied
 

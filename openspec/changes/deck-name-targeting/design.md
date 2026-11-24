@@ -25,14 +25,15 @@ See proposal.md - Why for motivation. The current state: autokards targets gener
 **Alternatives considered:**
 - Numeric Deck ID binding — rejected: AUTK-2 spike showed ID-only routing infeasible (Anki remaps IDs on import).
 - Deck name + numeric ID — rejected: numeric ID adds no routing value and reintroduces the infeasible assumption.
+- Deck-name binding via AnkiConnect lookup (collection access) — rejected for MVP: requires autokards to access/query the user's Anki collection, adds auth/state complexity and coupling to a running Anki instance, contradicting the export-only MVP constraint. Revisit post-MVP if collection access becomes a requirement.
 
 ### Subdeck creation vs. existing-deck-only
 **Decision:** Allow Anki to auto-create missing decks/subdecks on import (native behavior); do not require the target deck to pre-exist.
 **Rationale:** Lower user friction for first-time setup; avoids autokards needing collection access to check existence. The spec labels this as relying on Anki's native behavior rather than an autokards guarantee.
 
 ### `::` sanitization at autokards boundary
-**Decision:** autokards validates/sanitizes deck names at the boundary — reject empty segments, strip leading/trailing whitespace — then passes the name through verbatim into the `.apkg`.
-**Rationale:** Prevents malformed packages while preserving full fidelity with the user's existing Anki structure. Exact sanitization rules are an open question labeled in the PRD.
+**Decision:** autokards validates/sanitizes deck names at the boundary — reject empty names, reject empty `::` segments (e.g. `"Spanish::"`, `"::Verbs"`, `"Spanish:::Verbs"`), strip leading/trailing whitespace — then writes the resulting normalized name into the `.apkg`. The normalization contract is: strip leading/trailing whitespace from the whole name, split on `::`, strip each segment, reject if any segment is empty, rejoin segments with `::`. The resulting normalized name is what autokards writes into the package; Anki resolves and may further normalize per component on import.
+**Rationale:** Prevents malformed packages while preserving full fidelity with the user's existing Anki structure. Comparison in SM-12 must be against the *normalized* deck name (post-stripping), not the raw user input, because Anki normalizes per component itself on import. Exact sanitization rules beyond empty segments/whitespace are an open question labeled in the PRD.
 
 ### Duplicate handling via Anki's defaults
 **Decision:** Rely on Anki's default note-type update rules on re-import; autokards specifies no duplicate-handling behavior.
